@@ -3,8 +3,6 @@
 __all__ = [
     "Term",
     "TermSum",
-    # "TermDiff",
-    # "TermConvolution",
     "CeleriteTerm",
     "SHOTerm",
     "RotationTerm",

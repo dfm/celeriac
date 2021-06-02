@@ -2,14 +2,18 @@
 
 from typing import Optional, Tuple
 
+import chex
+import jax.numpy as jnp
 import numpy as np
-import pytest
-from jax.config import config
+from absl.testing import parameterized
 
 from celeriac import ops, terms
 from celeriac.types import Array
 
-config.update("jax_enable_x64", True)  # type: ignore
+# from jax.config import config
+
+
+# config.update("jax_enable_x64", True)  # type: ignore
 
 
 def get_matrices(
@@ -54,72 +58,97 @@ def get_matrices(
     return x, a, U, V, P, Y, t, U2, V2
 
 
-@pytest.mark.parametrize("vector", [True, False])
-def test_solve_lower(vector: bool) -> None:
-    x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
-
-    if vector:
-        Y = Y[:, None]
-
-    # First compute the expected value
-    expect = np.linalg.solve(np.linalg.cholesky(K), Y)
-
-    # Then solve using celerite
-    d, W = ops.factor(a, U, V, P)
-    value = ops.solve_lower(U, W, P, Y)
-    value /= np.sqrt(d)[:, None]
-
-    # Check that the solution is correct
-    np.testing.assert_allclose(value, expect)
+def compare(a: Array, b: Array) -> None:
+    if a.dtype == np.float32 or b.dtype == np.float32:
+        chex.assert_tree_all_close(a, b, atol=1e-3)
+    else:
+        chex.assert_tree_all_close(a, b)
 
 
-@pytest.mark.parametrize("vector", [True, False])
-def test_solve_upper(vector: bool) -> None:
-    x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+class TestSolveLower(parameterized.TestCase):
+    @chex.variants(with_jit=True, without_jit=True)
+    @parameterized.named_parameters(("vector", True), ("marix", False))
+    def test(self, vector: bool) -> None:
+        x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+        if vector:
+            Y = Y[:, None]
+        expect = jnp.linalg.solve(jnp.linalg.cholesky(K), Y)
 
-    if vector:
-        Y = Y[:, None]
+        @self.variant
+        def func(a: Array, U: Array, V: Array, P: Array, Y: Array) -> None:
+            d, W = ops.factor(a, U, V, P)
+            value = ops.solve_lower(U, W, P, Y)
+            return value / jnp.sqrt(d)[:, None]
 
-    # First compute the expected value
-    expect = np.linalg.solve(np.linalg.cholesky(K).T, Y)
-
-    # Then solve using celerite
-    d, W = ops.factor(a, U, V, P)
-    value = ops.solve_upper(U, W, P, Y / np.sqrt(d)[:, None])
-
-    # Check that the solution is correct
-    np.testing.assert_allclose(value, expect)
-
-
-@pytest.mark.parametrize("vector", [True, False])
-def test_matmul_lower(vector: bool) -> None:
-    x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
-
-    if vector:
-        Y = Y[:, None]
-
-    # First compute the expected value
-    expect = np.dot(np.tril(K, -1), Y)
-
-    # Then solve using celerite
-    value = ops.matmul_lower(U, V, P, Y)
-
-    # Check that the solution is correct
-    assert np.allclose(value, expect)
+        compare(func(a, U, V, P, Y), expect)
 
 
-@pytest.mark.parametrize("vector", [True, False])
-def test_matmul_upper(vector: bool) -> None:
-    x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+# @pytest.mark.parametrize("vector", [True, False])
+# def test_solve_lower(vector: bool) -> None:
+#     x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
 
-    if vector:
-        Y = Y[:, None]
+#     if vector:
+#         Y = Y[:, None]
 
-    # First compute the expected value
-    expect = np.dot(np.triu(K, 1), Y)
+#     # First compute the expected value
+#     expect = np.linalg.solve(np.linalg.cholesky(K), Y)
 
-    # Then solve using celerite
-    value = ops.matmul_upper(U, V, P, Y)
+#     # Then solve using celerite
+#     d, W = ops.factor(a, U, V, P)
+#     value = ops.solve_lower(U, W, P, Y)
+#     value /= np.sqrt(d)[:, None]
 
-    # Check that the solution is correct
-    assert np.allclose(value, expect)
+#     # Check that the solution is correct
+#     chex.assert_tree_all_close(value, expect)
+
+
+# @pytest.mark.parametrize("vector", [True, False])
+# def test_solve_upper(vector: bool) -> None:
+#     x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+
+#     if vector:
+#         Y = Y[:, None]
+
+#     # First compute the expected value
+#     expect = np.linalg.solve(np.linalg.cholesky(K).T, Y)
+
+#     # Then solve using celerite
+#     d, W = ops.factor(a, U, V, P)
+#     value = ops.solve_upper(U, W, P, Y / np.sqrt(d)[:, None])
+
+#     # Check that the solution is correct
+#     np.testing.assert_allclose(value, expect)
+
+
+# @pytest.mark.parametrize("vector", [True, False])
+# def test_matmul_lower(vector: bool) -> None:
+#     x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+
+#     if vector:
+#         Y = Y[:, None]
+
+#     # First compute the expected value
+#     expect = np.dot(np.tril(K, -1), Y)
+
+#     # Then solve using celerite
+#     value = ops.matmul_lower(U, V, P, Y)
+
+#     # Check that the solution is correct
+#     assert np.allclose(value, expect)
+
+
+# @pytest.mark.parametrize("vector", [True, False])
+# def test_matmul_upper(vector: bool) -> None:
+#     x, a, U, V, P, K, Y = get_matrices(vector=vector, include_dense=True)
+
+#     if vector:
+#         Y = Y[:, None]
+
+#     # First compute the expected value
+#     expect = np.dot(np.triu(K, 1), Y)
+
+#     # Then solve using celerite
+#     value = ops.matmul_upper(U, V, P, Y)
+
+#     # Check that the solution is correct
+#     assert np.allclose(value, expect)

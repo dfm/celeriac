@@ -23,7 +23,7 @@ CLASSIFIERS = [
 INSTALL_REQUIRES = ["numpy", "jax", "jaxlib"]
 EXTRA_REQUIRE = {
     "docs": ["sphinx>=1.7.5", "myst-nb", "sphinx-book-theme"],
-    "test": ["pytest"],
+    "test": ["pytest", "chex"],
     "lint": ["mypy", "pre-commit"],
 }
 

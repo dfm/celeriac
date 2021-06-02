@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
-__all__ = ["ops"]
+__all__ = ["GaussianProcess", "terms"]
 
-from . import ops
+from . import terms
 from .celeriac_version import __version__  # noqa
+from .gp import GaussianProcess
 
 __uri__ = "https://github.com/dfm/celeriac"
 __author__ = "Dan Foreman-Mackey"
